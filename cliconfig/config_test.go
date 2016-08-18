@@ -376,6 +376,78 @@ func TestJsonWithPsFormat(t *testing.T) {
 	}
 }
 
+func TestJsonWithCredentialStore(t *testing.T) {
+	tmpHome, err := ioutil.TempDir("", "config-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpHome)
+
+	fn := filepath.Join(tmpHome, ConfigFileName)
+	js := `{
+		"auths": { "https://index.docker.io/v1/": { "auth": "am9lam9lOmhlbGxv", "email": "user@example.com" } },
+		"credsStore": "crazy-secure-storage"
+}`
+	if err := ioutil.WriteFile(fn, []byte(js), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := Load(tmpHome)
+	if err != nil {
+		t.Fatalf("Failed loading on empty json file: %q", err)
+	}
+
+	if config.CredentialsStore != "crazy-secure-storage" {
+		t.Fatalf("Unknown credential store: %s\n", config.CredentialsStore)
+	}
+
+	// Now save it and make sure it shows up in new form
+	configStr := saveConfigAndValidateNewFormat(t, config, tmpHome)
+	if !strings.Contains(configStr, `"credsStore":`) ||
+		!strings.Contains(configStr, "crazy-secure-storage") {
+		t.Fatalf("Should have save in new form: %s", configStr)
+	}
+}
+
+func TestJsonWithCredentialHelpers(t *testing.T) {
+	tmpHome, err := ioutil.TempDir("", "config-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpHome)
+
+	fn := filepath.Join(tmpHome, ConfigFileName)
+	js := `{
+		"auths": { "https://index.docker.io/v1/": { "auth": "am9lam9lOmhlbGxv", "email": "user@example.com" } },
+		"credentialHelpers": { "images.io": "images-io", "containers.com": "crazy-secure-storage" }
+}`
+	if err := ioutil.WriteFile(fn, []byte(js), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := Load(tmpHome)
+	if err != nil {
+		t.Fatalf("Failed loading on empty json file: %q", err)
+	}
+
+	if config.CredentialHelpers == nil {
+		t.Fatal("config.CredentialHelpers was nil")
+	} else if config.CredentialHelpers["images.io"] != "images-io" ||
+		config.CredentialHelpers["containers.com"] != "crazy-secure-storage" {
+		t.Fatalf("Credential helpers not deserialized properly: %v\n", config.CredentialHelpers)
+	}
+
+	// Now save it and make sure it shows up in new form
+	configStr := saveConfigAndValidateNewFormat(t, config, tmpHome)
+	if !strings.Contains(configStr, `"credentialHelpers":`) ||
+		!strings.Contains(configStr, "images.io") ||
+		!strings.Contains(configStr, "images-io") ||
+		!strings.Contains(configStr, "containers.com") ||
+		!strings.Contains(configStr, "crazy-secure-storage") {
+		t.Fatalf("Should have save in new form: %s", configStr)
+	}
+}
+
 // Save it and make sure it shows up in new form
 func saveConfigAndValidateNewFormat(t *testing.T, config *configfile.ConfigFile, homeFolder string) string {
 	if err := config.Save(); err != nil {

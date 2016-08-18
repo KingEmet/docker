@@ -30,6 +30,7 @@ type ConfigFile struct {
 	VolumesFormat        string                      `json:"volumesFormat,omitempty"`
 	DetachKeys           string                      `json:"detachKeys,omitempty"`
 	CredentialsStore     string                      `json:"credsStore,omitempty"`
+	CredentialHelpers    map[string]string           `json:"credentialHelpers,omitempty"`
 	Filename             string                      `json:"-"` // Note: for internal use only
 	ServiceInspectFormat string                      `json:"serviceInspectFormat,omitempty"`
 }
@@ -95,6 +96,7 @@ func (configFile *ConfigFile) LoadFromReader(configData io.Reader) error {
 // in this file or not.
 func (configFile *ConfigFile) ContainsAuth() bool {
 	return configFile.CredentialsStore != "" ||
+		(configFile.CredentialHelpers != nil && len(configFile.CredentialHelpers) > 0) ||
 		(configFile.AuthConfigs != nil && len(configFile.AuthConfigs) > 0)
 }
 
