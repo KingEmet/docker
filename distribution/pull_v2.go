@@ -69,12 +69,14 @@ func (p *v2Puller) Pull(ctx context.Context, ref reference.Named, platform strin
 		logrus.Warnf("Error getting v2 registry: %v", err)
 		return err
 	}
+	
+	logrus.Errorf("About to pull pullV2Repository: %v", ref)
 
 	if err = p.pullV2Repository(ctx, ref, platform); err != nil {
 		if _, ok := err.(fallbackError); ok {
 			return err
 		}
-		if continueOnError(err) {
+		if continueOnError(err, p.endpoint.Mirror) {
 			return fallbackError{
 				err:         err,
 				confirmedV2: p.confirmedV2,
@@ -88,11 +90,14 @@ func (p *v2Puller) Pull(ctx context.Context, ref reference.Named, platform strin
 func (p *v2Puller) pullV2Repository(ctx context.Context, ref reference.Named, platform string) (err error) {
 	var layersDownloaded bool
 	if !reference.IsNameOnly(ref) {
+		logrus.Error("!IsNameOnly")
 		layersDownloaded, err = p.pullV2Tag(ctx, ref, platform)
+		logrus.Errorf("pullV2Tag: %v, %v", layersDownloaded, err)
 		if err != nil {
 			return err
 		}
 	} else {
+		logrus.Error("IsNameOnly")
 		tags, err := p.repo.Tags(ctx).All(ctx)
 		if err != nil {
 			// If this repository doesn't exist on V2, we should
@@ -327,23 +332,28 @@ func (ld *v2LayerDescriptor) Registered(diffID layer.DiffID) {
 }
 
 func (p *v2Puller) pullV2Tag(ctx context.Context, ref reference.Named, os string) (tagUpdated bool, err error) {
+	logrus.Error("Before manifests")
 	manSvc, err := p.repo.Manifests(ctx)
 	if err != nil {
 		return false, err
 	}
+	logrus.Error("After manifests")
 
 	var (
 		manifest    distribution.Manifest
 		tagOrDigest string // Used for logging/progress only
 	)
 	if digested, isDigested := ref.(reference.Canonical); isDigested {
+		logrus.Error("isDigested")
 		manifest, err = manSvc.Get(ctx, digested.Digest())
 		if err != nil {
 			return false, err
 		}
 		tagOrDigest = digested.Digest().String()
 	} else if tagged, isTagged := ref.(reference.NamedTagged); isTagged {
+		logrus.Error("isTagged")
 		manifest, err = manSvc.Get(ctx, "", distribution.WithTag(tagged.Tag()))
+		logrus.Errorf("manSvc.Get: %v %v", manifest, err)
 		if err != nil {
 			return false, allowV1Fallback(err)
 		}
